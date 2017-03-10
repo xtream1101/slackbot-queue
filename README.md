@@ -31,3 +31,12 @@ The class in these files takes 1 arg in its `__init__` function called `utils`.
 - `users`: Dict of all the users and their data. The keys are the user ids as well as the user names
 - `ims`: Dict of all the direct messages and their data. The keys are the direct messages ids only
 - `mq`: The message queue from `pika`, set using `connection.channel()`
+
+
+#### Command function return values
+Return a dict with as many or as few of these keys as needed (if a blank dict is passed, nothing will be posted):
+- `text`: String that will be posted
+- `attachments`: List of dict(s), Check the slack api docs on how to format the dict
+- `thread_reply`: `Boolean` - _Default: `False`_. Set to `True` to repsond to the users command in a thread.
+- `add_to_queue`: `Boolean` - _Default: `False`_. Set to `True` to send the task to be process by the workers. Not used if the task is being processed by a worker
+- Any other value that the slack `api_call` call takes can also be passed in.
