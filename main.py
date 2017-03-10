@@ -12,7 +12,7 @@ parser.add_argument('-w', '--worker', action='store_true', help='Set if this ins
 args = parser.parse_args()
 
 # TODO: make an arg using argparse
-config_file = os.path.join(args.commands_path, 'config.yaml')
+config_file = os.path.join(args.command_path, 'config.yaml')
 CONFIG = yaml.load(open(config_file, 'r'))
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,6 @@ logging.basicConfig(level=logging.INFO,
 
 if __name__ == '__main__':
     if args.worker is False:
-        task = Listener(config=CONFIG, cmd_path=args.commands_path, is_worker=False)
+        task = Listener(config=CONFIG, cmd_path=args.command_path, is_worker=False)
     else:
-        task = Worker(config=CONFIG, cmd_path=args.commands_path, is_worker=True)
+        task = Worker(config=CONFIG, cmd_path=args.command_path, is_worker=True)
