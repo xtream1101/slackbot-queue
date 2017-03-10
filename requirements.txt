@@ -1,0 +1,9 @@
+parse>=1.8.0
+pika>=0.10.0
+PyYAML>=3.12
+regex-decorator>=0.3.0
+requests>=2.13.0
+six>=1.10.0
+slackclient>=1.0.5
+websocket-client>=0.40.0
+wheel>=0.26.0

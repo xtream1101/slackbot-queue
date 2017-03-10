@@ -9,9 +9,9 @@ This repo contains the core of the slackbot. The commands to listen for and the 
 - `-w` or `--worker`: Set this flag to denote that this instance is a worker
 
 ### Usage
-Must have a RabbitMQ server running somewhere where this bot can access (set in the config file)
-
-`$ python3 main.py [args]`  
+Must have a RabbitMQ server running somewhere where this bot can access (set in the config file)  
+`$ pip3 install -r requirements.txt`  
+`$ python3 main.py -c ./example [-w]`  
 There must be **only** one non-worker _(listener)_ and at least one worker for the bot to operate fully.
 
 ### Commands Folder
