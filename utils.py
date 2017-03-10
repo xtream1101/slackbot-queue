@@ -11,7 +11,7 @@ class Utils:
 
     def __init__(self, config, cmd_path, is_worker=False):
         self.CONFIG = config
-        self.cmd_path = cmd_path
+        self._cmd_path = cmd_path
         self.is_worker = is_worker
 
         self.slack_client = SlackClient(self.CONFIG['SLACK_TOKEN'])
@@ -79,13 +79,13 @@ class Utils:
     ###
     def _load_commands(self):
         rdata = {}
-        command_files = os.listdir(self.cmd_path)
+        command_files = os.listdir(self._cmd_path)
         for file in command_files:
             if not file.startswith('__') and file.endswith('.py'):
                 file_name = file.replace('.py', '')
                 class_name = file_name.replace('_', ' ').title().replace(' ', '')
 
-                file_path = os.path.join(self.cmd_path, file)
+                file_path = os.path.join(self._cmd_path, file)
                 loader = importlib.machinery.SourceFileLoader(file_name, file_path).load_module()
                 cls_name = getattr(loader, class_name)
 
