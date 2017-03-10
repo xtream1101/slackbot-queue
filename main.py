@@ -6,7 +6,7 @@ from worker import Worker
 from listener import Listener
 
 parser = argparse.ArgumentParser(description='Meeseeks Box')
-parser.add_argument('-c', '--commands-path', help='Path to the folder with commands',
+parser.add_argument('-c', '--command-path', help='Path to the folder with commands',
                     nargs='?', required=True)
 parser.add_argument('-w', '--worker', action='store_true', help='Set if this instance is a worker')
 args = parser.parse_args()
