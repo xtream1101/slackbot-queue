@@ -56,13 +56,13 @@ class Listener(Utils):
                 break
             else:
                 # Refresh both channels and ims and try again
-                self.channels = self.get_channel_list()
-                self.ims = self.get_im_list()
+                self.reload_channel_list()
+                self.reload_im_list()
 
         try:
             user_data = self.users[message_data['user']]
         except KeyError:
-            self.users = self.get_user_list()
+            self.reload_user_list()
         finally:
             user_data = self.users[message_data['user']]
 

@@ -15,46 +15,55 @@ class Utils:
         self.is_worker = is_worker
 
         self.slack_client = SlackClient(self.CONFIG['SLACK_TOKEN'])
-        self.channels = self.get_channel_list()
-        self.users = self.get_user_list()
-        self.ims = self.get_im_list()
+        self.channels = self._get_channel_list()
+        self.users = self._get_user_list()
+        self.ims = self._get_im_list()
 
         self.BOT_ID = self.users[self.CONFIG['BOT_NAME']]['id']
         self.BOT_NAME = '<@{}>'.format(self.BOT_ID)
 
-        self.commands = self.load_commands()  # Needs to be after BOT_NAME is set
+        self.commands = self._load_commands()  # Needs to be after BOT_NAME is set
 
         self.channel_to_actions = self.CONFIG['CHANNEL_TO_ACTIONS']
 
         self.mq_name = self.CONFIG['RABBITMQ']['QUEUE_NAME']
-        self.mq = self.setup_rabbitmq()  # Needs to be after mq_name is set
+        self.mq = self._setup_rabbitmq()  # Needs to be after mq_name is set
 
     ###
     # Slack Functions
     ###
-    def get_channel_list(self):
+    def _get_channel_list(self):
         channels_call = self.slack_client.api_call("channels.list", exclude_archived=1)
         if channels_call['ok']:
             by_id = {item['id']: item for item in channels_call['channels']}
             by_name = {item['name']: item for item in channels_call['channels']}
             return {**by_id, **by_name}
 
-    def get_user_list(self):
+    def _get_user_list(self):
         users_call = self.slack_client.api_call("users.list")
         if users_call['ok']:
             by_id = {item['id']: item for item in users_call['members']}
             by_name = {item['name']: item for item in users_call['members']}
             return {**by_id, **by_name}
 
-    def get_im_list(self):
+    def _get_im_list(self):
         ims_call = self.slack_client.api_call("im.list")
         if ims_call['ok']:
             return {item['id']: item for item in ims_call['ims']}
 
+    def reload_channel_list(self):
+        self.channels = self._get_channel_list()
+
+    def reload_im_list(self):
+        self.ims = self._get_im_list()
+
+    def reload_user_list(self):
+        self.users = self._get_user_list()
+
     ###
     # Rabbitmq Functions
     ###
-    def setup_rabbitmq(self):
+    def _setup_rabbitmq(self):
         credentials = pika.PlainCredentials(self.CONFIG['RABBITMQ'].get('USER', 'guest'),
                                             self.CONFIG['RABBITMQ'].get('PASSWORD', 'guest'))
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.CONFIG['RABBITMQ']['HOST'],
@@ -68,7 +77,7 @@ class Utils:
     ###
     # System Functions
     ###
-    def load_commands(self):
+    def _load_commands(self):
         rdata = {}
         command_files = os.listdir(self.cmd_path)
         for file in command_files:
@@ -80,8 +89,6 @@ class Utils:
                 loader = importlib.machinery.SourceFileLoader(file_name, file_path).load_module()
                 cls_name = getattr(loader, class_name)
 
-                rdata[file_name] = cls_name(slack_client=self.slack_client,
-                                            bot_name=self.BOT_NAME,
-                                            is_worker=self.is_worker)
+                rdata[file_name] = cls_name(utils=self)
 
         return rdata
