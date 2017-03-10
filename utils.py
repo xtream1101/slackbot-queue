@@ -1,7 +1,10 @@
 import os
 import pika
-import importlib
+import logging
+import importlib.machinery
 from slackclient import SlackClient
+
+logger = logging.getLogger(__name__)
 
 
 class Utils:
