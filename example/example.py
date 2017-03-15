@@ -14,13 +14,13 @@ class Example:
         self.test = self.p.listener('test (.+)', re.IGNORECASE, parse_using='re')(self.test)
         self.queue = self.p.listener(self.utils.BOT_NAME + ' queue (.+)', re.IGNORECASE, parse_using='re')(self.queue)
 
-    def test(self, matched_str, value):
+    def test(self, matched_str, value, full_post=None):
         message_data = {'text': "Test value is: {value}".format(value=value),
                         'attachments': [],
                         }
         return message_data
 
-    def queue(self, matched_str, value):
+    def queue(self, matched_str, value, full_post=None):
         message_data = {}
 
         if self.utils.is_worker is False:

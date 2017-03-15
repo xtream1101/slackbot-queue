@@ -16,24 +16,24 @@ class Worker(Utils):
 
     def callback(self, ch, method, properties, full_data):
         full_data = json.loads(full_data.decode('utf-8'))
-        response = {'channel': full_data['channel_data']['id'],  # Should not be changed
+        response = {'channel': full_data['channel']['id'],  # Should not be changed
                     'as_user': True,  # Should not be changed
                     'text': '',
                     'attachments': [],
                     'thread_reply': False,  # Only here for the response, does not get passed to the api call
                     }
 
-        for command_name in self.channel_to_actions[full_data['channel_data']['name']]:
+        for command_name in self.channel_to_actions[full_data['channel']['name']]:
             command = self.commands[command_name]
 
-            parsed_response = command.p.parse(full_data['message_data']['text'])
+            parsed_response = command.p.parse(full_data['message']['text'], full_post=full_data)
             if parsed_response is not None:
                 response.update(parsed_response)
                 break
 
-        if response.get('thread_reply') is True or full_data['message_data'].get('thread_ts') is not None:
+        if response.get('thread_reply') is True or full_data['message'].get('thread_ts') is not None:
             # Reply to the message using a thread
-            response['thread_ts'] = full_data['message_data'].get('thread_ts', full_data['message_data']['ts'])
+            response['thread_ts'] = full_data['message_data'].get('thread_ts', full_data['message']['ts'])
             try:
                 del response['thread_reply']  # Cannot be passed to the api_call fn
             except KeyError:

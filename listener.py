@@ -2,6 +2,7 @@ import time
 import json
 import logging
 from utils import Utils
+from pprint import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +67,12 @@ class Listener(Utils):
         finally:
             user_data = self.users[message_data['user']]
 
-        full_data = {'channel_data': channel_data,
-                     'message_data': message_data,
+        full_data = {'channel': channel_data,
+                     'message': message_data,
                      'user': user_data,
                      }
+
+        # pprint(full_data)
 
         if full_data['user'].get('is_bot') is False and self.channel_to_actions.get(channel_data['name']) is not None:
             response = {'channel': channel_data['id'],  # Should not be changed
@@ -82,14 +85,14 @@ class Listener(Utils):
 
             is_help_message = False
             help_message_text = '{bot_name} help'.format(bot_name=self.BOT_NAME)
-            if full_data['message_data']['text'] == help_message_text:
+            if full_data['message']['text'] == help_message_text:
                 is_help_message = True
 
             for command_name in self.channel_to_actions[channel_data['name']]:
                 command = self.commands[command_name]
 
                 if is_help_message is False:
-                    parsed_response = command.p.parse(full_data['message_data']['text'])
+                    parsed_response = command.p.parse(full_data['message']['text'], full_post=full_data)
                     if parsed_response is not None:
                         response.update(parsed_response)
                         break
