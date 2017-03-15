@@ -1,5 +1,6 @@
 import os
 import pika
+import urllib
 import logging
 import importlib.machinery
 from slackclient import SlackClient
@@ -93,5 +94,42 @@ class Utils:
                 cls_name = getattr(loader, class_name)
 
                 rdata[file_name] = cls_name(utils=self)
+
+        return rdata
+
+    def download(self, url, filename):
+        """
+        :return: absolute path of file
+        """
+        rdata = None
+
+        base_dir = 'tmp_downloads'
+        try:
+            os.mkdir(base_dir)
+        except FileExistsError:
+            pass
+
+        file_path = os.path.join(base_dir, filename)
+
+        try:
+            request = urllib.request.Request(url)
+            request.add_header('Authorization', 'Bearer {}'.format(self.CONFIG['SLACK_TOKEN']))
+            # urllib downloads files a bit faster then requests does
+            with urllib.request.urlopen(request) as response, open(file_path, 'wb') as out_file:
+                data = response.read()
+                out_file.write(data)
+
+        except urllib.error.HTTPError as e:
+            rdata = None
+            # We do not need to show the user 404 errors
+            if e.code != 404:
+                logger.exception("Download Http Error ({})".format(url))
+
+        except Exception:
+            rdata = None
+            logger.exception("Download Error: ".format(url))
+
+        finally:
+            rdata = os.path.abspath(file_path)
 
         return rdata
