@@ -1,5 +1,7 @@
 # Slack Task Queue
 
+Version: 0.1.0
+
 This project enables large tasks to be run on distributed workers so it will not lock up or crash the main bot. Not all commands have to use the workers but the tasks that are known to need more cpu/ram/etc then what the bot is running on would use the workers.
 
 This repo contains the core of the slackbot. The commands to listen for and the actions to take can be stored in its own repo. There is a folder `example` which has example commands and a default config file to demo how to use project.
