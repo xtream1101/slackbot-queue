@@ -14,14 +14,14 @@ class Listener(Utils):
 
         READ_WEBSOCKET_DELAY = 1  # 1 second delay between reading from firehose
         if self.slack_client.rtm_connect():
-            print("StarterBot connected and running!")
+            logger.info("StarterBot connected and running!")
             while True:
                 message_data = self.parse_slack_output(self.slack_client.rtm_read())
                 if message_data is not None:
                     self.handle_command(message_data)
                 time.sleep(READ_WEBSOCKET_DELAY)
         else:
-            print("Connection failed. Invalid Slack token or bot ID?")
+            logger.critical("Connection failed. Invalid Slack token or bot ID?")
 
     def parse_slack_output(self, slack_rtm_output):
         """
