@@ -19,7 +19,7 @@ class Listener(Utils):
                 message_data = self.parse_slack_output(self.slack_client.rtm_read())
                 if message_data is not None:
                     self.handle_command(message_data)
-                time.sleep(READ_WEBSOCKET_DELAY)
+                self.connection.sleep(READ_WEBSOCKET_DELAY)
         else:
             logger.critical("Connection failed. Invalid Slack token or bot ID?")
 
@@ -111,18 +111,12 @@ class Listener(Utils):
                     pass
 
             if response.get('add_to_queue') is True:
-                for i in range(2):
-                    try:
-                        self.mq.basic_publish(exchange='',
-                                              routing_key=self.mq_name,
-                                              body=json.dumps(full_data))
-                        break
-
-                    except:
-                        # From utils, re create the connection
-                        self._setup_rabbitmq()
-                        if i == 1:
-                            logger.exception("Failed to reconnect to rabbitmq")
+                try:
+                    self.mq.basic_publish(exchange='',
+                                          routing_key=self.mq_name,
+                                          body=json.dumps(full_data))
+                except:
+                    logger.exception("Failed to add item to queue")
 
             try:
                 del response['add_to_queue']  # Cannot be passed to the api_call fn

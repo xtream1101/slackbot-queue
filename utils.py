@@ -31,6 +31,7 @@ class Utils:
         self.channel_to_actions = self.CONFIG['CHANNEL_TO_ACTIONS']
 
         self.mq_name = self.CONFIG['RABBITMQ']['QUEUE_NAME']
+        self.connection = None
         self.mq = self._setup_rabbitmq()  # Needs to be after mq_name is set
 
     ###
@@ -70,10 +71,10 @@ class Utils:
     def _setup_rabbitmq(self):
         credentials = pika.PlainCredentials(self.CONFIG['RABBITMQ'].get('USER', 'guest'),
                                             self.CONFIG['RABBITMQ'].get('PASSWORD', 'guest'))
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.CONFIG['RABBITMQ']['HOST'],
+        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.CONFIG['RABBITMQ']['HOST'],
                                                                        credentials=credentials,
                                                                        virtual_host=self.CONFIG['RABBITMQ'].get('VHOST', '/')))
-        mq = connection.channel()
+        mq = self.connection.channel()
         mq.queue_declare(queue=self.mq_name, durable=True)
 
         return mq
