@@ -111,9 +111,18 @@ class Listener(Utils):
                     pass
 
             if response.get('add_to_queue') is True:
-                self.mq.basic_publish(exchange='',
-                                      routing_key=self.mq_name,
-                                      body=json.dumps(full_data))
+                for i in range(2):
+                    try:
+                        self.mq.basic_publish(exchange='',
+                                              routing_key=self.mq_name,
+                                              body=json.dumps(full_data))
+
+                    except:
+                        # From utils, re create the connection
+                        self._setup_rabbitmq()
+                        if i == 1:
+                            logger.exception("Failed to reconnect to rabbitmq")
+
             try:
                 del response['add_to_queue']  # Cannot be passed to the api_call fn
             except KeyError:
