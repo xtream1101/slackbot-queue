@@ -14,7 +14,7 @@ class Listener(Utils):
 
         READ_WEBSOCKET_DELAY = 1  # 1 second delay between reading from firehose
         if self.slack_client.rtm_connect():
-            logger.info("StarterBot connected and running!")
+            logger.info("Bot connected and running!")
             while True:
                 message_data = self.parse_slack_output(self.slack_client.rtm_read())
                 if message_data is not None:
@@ -116,6 +116,7 @@ class Listener(Utils):
                         self.mq.basic_publish(exchange='',
                                               routing_key=self.mq_name,
                                               body=json.dumps(full_data))
+                        break
 
                     except:
                         # From utils, re create the connection
