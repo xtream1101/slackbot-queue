@@ -20,6 +20,10 @@ class Utils:
 
         self.slack_client = SlackClient(self.CONFIG['SLACK_TOKEN'])
         self.channels = self._get_channel_list()
+        self.groups = self._get_group_list()
+        # Need his for private channels
+        self.channels.update(self.groups)
+
         self.users = self._get_user_list()
         self.ims = self._get_im_list()
 
@@ -42,6 +46,13 @@ class Utils:
         if channels_call['ok']:
             by_id = {item['id']: item for item in channels_call['channels']}
             by_name = {item['name']: item for item in channels_call['channels']}
+            return {**by_id, **by_name}
+
+    def _get_group_list(self):
+        groups_call = self.slack_client.api_call("groups.list", exclude_archived=1)
+        if groups_call['ok']:
+            by_id = {item['id']: item for item in groups_call['groups']}
+            by_name = {item['name']: item for item in groups_call['groups']}
             return {**by_id, **by_name}
 
     def _get_user_list(self):
