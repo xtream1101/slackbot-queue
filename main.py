@@ -9,11 +9,11 @@ parser = argparse.ArgumentParser(description='Meeseeks Box')
 parser.add_argument('-c', '--command-path', help='Path to the folder with commands',
                     nargs='?', required=True)
 parser.add_argument('-w', '--worker', action='store_true', help='Set if this instance is a worker')
+parser.add_argument('-f', '--config-file', default='config.yaml', help='The name of the config file')
 args = parser.parse_args()
 
-# TODO: make an arg using argparse
-config_file = os.path.join(args.command_path, 'config.yaml')
-CONFIG = yaml.load(open(config_file, 'r'))
+config_path = os.path.join(args.command_path, args.config_file)
+CONFIG = yaml.load(open(config_path, 'r'))
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO,
