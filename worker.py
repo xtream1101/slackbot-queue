@@ -33,7 +33,7 @@ class Worker(Utils):
 
         if response.get('thread_reply') is True or full_data['message'].get('thread_ts') is not None:
             # Reply to the message using a thread
-            response['thread_ts'] = full_data['message_data'].get('thread_ts', full_data['message']['ts'])
+            response['thread_ts'] = full_data['message'].get('thread_ts', full_data['message']['ts'])
             try:
                 del response['thread_reply']  # Cannot be passed to the api_call fn
             except KeyError:
