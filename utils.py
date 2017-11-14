@@ -129,7 +129,7 @@ class Utils:
                 if isinstance(file_, str):
                     file_path = os.path.abspath(os.path.join(base_dir, file_))
 
-                    try: os.mkdir(file_path)  # noqa
+                    try: os.mkdir(os.path.dirname(file_path))  # noqa
                     except FileExistsError: pass  # noqa
 
                     with open(file_path, 'wb') as out_file:
