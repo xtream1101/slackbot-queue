@@ -2,6 +2,8 @@ import os
 import pika
 import urllib
 import logging
+import urllib.error
+import urllib.request
 import importlib.machinery
 from slackclient import SlackClient
 
@@ -83,8 +85,9 @@ class Utils:
         credentials = pika.PlainCredentials(self.CONFIG['RABBITMQ'].get('USER', 'guest'),
                                             self.CONFIG['RABBITMQ'].get('PASSWORD', 'guest'))
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.CONFIG['RABBITMQ']['HOST'],
-                                                                       credentials=credentials,
-                                                                       virtual_host=self.CONFIG['RABBITMQ'].get('VHOST', '/')))
+                                                                            credentials=credentials,
+                                                                            virtual_host=self.CONFIG['RABBITMQ']
+                                                                                             .get('VHOST', '/')))
         mq = self.connection.channel()
         mq.queue_declare(queue=self.mq_name, durable=True)
 
@@ -109,39 +112,41 @@ class Utils:
 
         return rdata
 
-    def download(self, url, filename):
+    def download(self, url, file_):
         """
-        :return: absolute path of file
+        file_ is either a string (filename & path) to save the data to, or an in-memory object
         """
         rdata = None
 
         base_dir = 'tmp_downloads'
-        try:
-            os.mkdir(base_dir)
-        except FileExistsError:
-            pass
-
-        file_path = os.path.join(base_dir, filename)
 
         try:
             request = urllib.request.Request(url)
             request.add_header('Authorization', 'Bearer {}'.format(self.CONFIG['SLACK_TOKEN']))
             # urllib downloads files a bit faster then requests does
-            with urllib.request.urlopen(request) as response, open(file_path, 'wb') as out_file:
+            with urllib.request.urlopen(request) as response:
                 data = response.read()
-                out_file.write(data)
+                if isinstance(file_, str):
+                    file_path = os.path.abspath(os.path.join(base_dir, file_))
+
+                    try: os.mkdir(file_path)  # noqa
+                    except FileExistsError: pass  # noqa
+
+                    with open(file_path, 'wb') as out_file:
+                        out_file.write(data)
+
+                    rdata = file_path
+
+                else:
+                    file_.write(data)
+                    file_.seek(0)
+
+                    rdata = file_
 
         except urllib.error.HTTPError as e:
-            rdata = None
-            # We do not need to show the user 404 errors
-            if e.code != 404:
-                logger.exception("Download Http Error ({})".format(url))
+            logger.error("Download Http Error `{}` on {}".format(e.code, url))
 
         except Exception:
-            rdata = None
-            logger.exception("Download Error: ".format(url))
-
-        finally:
-            rdata = os.path.abspath(file_path)
+            logger.exception("Download Error on {}".format(url))
 
         return rdata
