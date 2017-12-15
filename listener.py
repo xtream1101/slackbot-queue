@@ -110,6 +110,17 @@ class Listener(Utils):
                 except KeyError:
                     pass
 
+            if response.get('reaction', '') != '':
+                self.slack_client.api_call("reactions.add",
+                                           channel=full_data['channel']['id'],
+                                           name=response['reaction'],
+                                           timestamp=full_data['message']['ts']
+                                           )
+                try:
+                    del response['reaction']  # Cannot be passed to the api_call fn
+                except KeyError:
+                    pass
+
             if response.get('add_to_queue') is True:
                 try:
                     self.mq.basic_publish(exchange='',

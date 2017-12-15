@@ -39,6 +39,17 @@ class Worker(Utils):
             except KeyError:
                 pass
 
+        if response.get('reaction', '') != '':
+            self.slack_client.api_call("reactions.add",
+                                       channel=full_data['channel']['id'],
+                                       name=response['reaction'],
+                                       timestamp=full_data['message']['ts']
+                                       )
+            try:
+                del response['reaction']  # Cannot be passed to the api_call fn
+            except KeyError:
+                pass
+
         if len(response.get('text', '').strip()) > 0 or len(response.get('attachments', [])) > 0:
             # Only post a message if needed. Reason not to would be the item got queued
             self.slack_client.api_call("chat.postMessage", **response)
