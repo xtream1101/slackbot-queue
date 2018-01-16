@@ -23,7 +23,7 @@ class Worker(Utils):
                     'thread_reply': False,  # Only here for the response, does not get passed to the api call
                     }
 
-        # Remove the message from the queue imme
+        # Remove the message from the queue immediately
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
         try:
