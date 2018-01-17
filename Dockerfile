@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add --no-cache python3 python3-dev ca-certificates
+RUN apk add --no-cache python3 python3-dev ca-certificates gcc g++
 
 # Copy app over
 COPY . /src/
