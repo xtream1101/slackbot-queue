@@ -102,7 +102,7 @@ class Listener(Utils):
                     if help_response is not None:
                         response['attachments'].extend(help_response)
 
-            if response.get('thread_reply') is True or message_data.get('thread_ts') is not None or is_help_message is True:
+            if response.get('thread_reply') is True or message_data.get('thread_ts') is not None or is_help_message is True: # noqa
                 # Reply to the message using a thread
                 response['thread_ts'] = message_data.get('thread_ts', message_data['ts'])
                 try:
@@ -123,6 +123,7 @@ class Listener(Utils):
 
             if response.get('add_to_queue') is True:
                 try:
+                    full_data['attempt'] = 1
                     self.mq.basic_publish(exchange='',
                                           routing_key=self.mq_name,
                                           body=json.dumps(full_data))

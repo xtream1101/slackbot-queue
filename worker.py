@@ -60,5 +60,9 @@ class Worker(Utils):
         except Exception as e:
             # if message is not processed properly, put it back in the queue
             logger.error(str(e))
-            logger.info('Putting message back in queue for retry.')
-            self.mq.basic_publish(exchange='', routing_key=self.mq_name, body=json.dumps(full_data))
+            if full_data['attempt'] < 3:
+                full_data['attempt'] += 1
+                logger.info('Putting message back in queue for retry.')
+                self.mq.basic_publish(exchange='', routing_key=self.mq_name, body=json.dumps(full_data))
+            else:
+                logger.info('Unable to complete task after 3 tries.')
