@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 from utils import Utils
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,9 @@ class Worker(Utils):
             if len(response.get('text', '').strip()) > 0 or len(response.get('attachments', [])) > 0:
                 # Only post a message if needed. Reason not to would be the item got queued
                 self.slack_client.api_call("chat.postMessage", **response)
-        except Exception as e:
+        except Exception:
             # if message is not processed properly, put it back in the queue
-            logger.error(str(e))
+            logger.error(traceback.format_exc())
             if full_data['attempt'] < 3:
                 full_data['attempt'] += 1
                 logger.info('Putting message back in queue for retry.')
