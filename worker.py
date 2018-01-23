@@ -60,6 +60,7 @@ class Worker(Utils):
                 self.slack_client.api_call("chat.postMessage", **response)
         except Exception:
             # if message is not processed properly, put it back in the queue
+            # TODO: this isn't working if the error happens late in a long-running task
             logger.error(traceback.format_exc())
             if full_data['attempt'] < 3:
                 full_data['attempt'] += 1
