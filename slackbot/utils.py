@@ -1,5 +1,5 @@
 import os
-import pika
+import yaml
 import urllib
 import logging
 import urllib.error
@@ -15,15 +15,18 @@ class Utils:
     Shared functions
     """
 
-    def __init__(self, config, cmd_path, is_worker=False):
-        self.CONFIG = config
-        self._cmd_path = cmd_path
-        self.is_worker = is_worker
+    def __init__(self):
+        self.CONFIG = yaml.load(open(os.environ['SB_CONFIG'], 'r'))
+        self._cmd_path = os.environ['SB_CMD']
+        if os.environ.get('SB_WORKER', 'true').lower() == 'false':
+            self.is_worker = False
+        else:
+            self.is_worker = True
 
         self.slack_client = SlackClient(self.CONFIG['SLACK_TOKEN'])
         self.channels = self._get_channel_list()
         self.groups = self._get_group_list()
-        # Need his for private channels
+        # Need this for private channels
         self.channels.update(self.groups)
 
         self.users = self._get_user_list()
@@ -35,10 +38,6 @@ class Utils:
         self.commands = self._load_commands()  # Needs to be after BOT_NAME is set
 
         self.channel_to_actions = self.CONFIG['CHANNEL_TO_ACTIONS']
-
-        self.mq_name = self.CONFIG['RABBITMQ']['QUEUE_NAME']
-        self.connection = None
-        self.mq = self._setup_rabbitmq()  # Needs to be after mq_name is set
 
     ###
     # Slack Functions
@@ -77,21 +76,6 @@ class Utils:
 
     def reload_user_list(self):
         self.users = self._get_user_list()
-
-    ###
-    # Rabbitmq Functions
-    ###
-    def _setup_rabbitmq(self):
-        credentials = pika.PlainCredentials(self.CONFIG['RABBITMQ'].get('USER', 'guest'),
-                                            self.CONFIG['RABBITMQ'].get('PASSWORD', 'guest'))
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters(host=self.CONFIG['RABBITMQ']['HOST'],
-                                                                            credentials=credentials,
-                                                                            virtual_host=self.CONFIG['RABBITMQ']
-                                                                                             .get('VHOST', '/')))
-        mq = self.connection.channel()
-        mq.queue_declare(queue=self.mq_name, durable=True)
-
-        return mq
 
     ###
     # System Functions

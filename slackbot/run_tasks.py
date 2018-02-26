@@ -1,8 +1,9 @@
+from .tasks import callback
+from .utils import Utils
+import yaml
+import logging
 import time
 import json
-import logging
-from utils import Utils
-from pprint import pprint
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class Listener(Utils):
                 message_data = self.parse_slack_output(self.slack_client.rtm_read())
                 if message_data is not None:
                     self.handle_command(message_data)
-                self.connection.sleep(READ_WEBSOCKET_DELAY)
+                time.sleep(READ_WEBSOCKET_DELAY)
         else:
             logger.critical("Connection failed. Invalid Slack token or bot ID?")
 
@@ -123,9 +124,7 @@ class Listener(Utils):
 
             if response.get('add_to_queue') is True:
                 try:
-                    self.mq.basic_publish(exchange='',
-                                          routing_key=self.mq_name,
-                                          body=json.dumps(full_data))
+                    callback.delay(json.dumps(full_data))
                 except:
                     logger.exception("Failed to add item to queue")
 
@@ -137,3 +136,7 @@ class Listener(Utils):
             if len(response.get('text', '').strip()) > 0 or len(response.get('attachments', [])) > 0:
                 # Only post a message if needed. Reason not to would be the item got queued
                 self.slack_client.api_call("chat.postMessage", **response)
+
+
+if __name__ == '__main__':
+    Listener()
