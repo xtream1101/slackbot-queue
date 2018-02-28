@@ -1,0 +1,29 @@
+from distutils.core import setup
+
+try:
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst', format='md')
+except (IOError, ImportError) as e:
+    print(str(e))
+    long_description = ''
+
+setup(
+    name='slack-queue',
+    packages=['slack_queue'],
+    version='0.0.1a',
+    description='Slackbot with a celery queue for large tasks',
+    long_description=long_description,
+    author='Eddy Hintze',
+    author_email="eddy@hintze.co",
+    url="https://github.com/xtream1101/slack-queue",
+    license='MIT',
+    classifiers=[
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Development Status :: 4 - Beta",
+        "Operating System :: OS Independent",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: Utilities",
+    ],
+    install_requires=[],
+)
