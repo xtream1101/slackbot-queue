@@ -26,8 +26,7 @@ class Utils:
         self.slack_client = SlackClient(self.CONFIG['SLACK_TOKEN'])
         self.channels = self._get_channel_list()
         self.groups = self._get_group_list()
-        # Need this for private channels
-        self.channels.update(self.groups)
+        self.channels.update(self.groups)  # Need this for private channels
 
         self.users = self._get_user_list()
         self.ims = self._get_im_list()

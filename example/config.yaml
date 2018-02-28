@@ -1,13 +1,15 @@
 RABBITMQ:
-  HOST: localhost
-  QUEUE_NAME: slackbot
+  HOST: 10.0.12.239
+  QUEUE_NAME: slackbot_dev
   USER: guest
   PASSWORD: guest
   VHOST: /
 
-SLACK_TOKEN:
-BOT_NAME: bot_name_here
+SLACK_TOKEN: xoxb-148877595856-eivFTywn9GajBPrczrSXnArL
+BOT_NAME: hal
 
 CHANNEL_TO_ACTIONS:
+  bot-dev-1:
+    - example
   __direct_message__:
     - example

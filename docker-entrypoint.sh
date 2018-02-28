@@ -7,7 +7,7 @@ echo $IS_WORKER
 cd /src/
 
 if $IS_WORKER; then
-    celery -A slackbot worker --loglevel=info
+    celery -A slackbot worker --loglevel=info -Ofair
 else
     python3 -m slackbot.run_tasks
 fi
