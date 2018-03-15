@@ -4,7 +4,6 @@ import urllib
 import logging
 import urllib.error
 import urllib.request
-import importlib.machinery
 from slackclient import SlackClient
 
 logger = logging.getLogger(__name__)
@@ -79,22 +78,6 @@ class Utils:
     ###
     # System Functions
     ###
-    def _load_commands(self):
-        rdata = {}
-        # command_files = os.listdir(self._cmd_path)
-        # for file in command_files:
-        #     if not file.startswith('__') and file.endswith('.py'):
-        #         file_name = file.replace('.py', '')
-        #         class_name = file_name.replace('_', ' ').title().replace(' ', '')
-
-        #         file_path = os.path.join(self._cmd_path, file)
-        #         loader = importlib.machinery.SourceFileLoader(file_name, file_path).load_module()
-        #         cls_name = getattr(loader, class_name)
-
-        #         rdata[file_name] = cls_name(utils=self)
-
-        return rdata
-
     def download(self, url, file_):
         """
         file_ is either a string (filename & path) to save the data to, or an in-memory object
