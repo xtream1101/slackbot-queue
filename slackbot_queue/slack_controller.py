@@ -68,9 +68,11 @@ class Parser:
                 if reaction_result is not None and message_result is not None:
                     # BUG: Both regexes need to use named groups or normal groups, cnnot be mixed
                     if len(reaction_result.groupdict().keys()) != 0:
-                        rdata = callback(reaction_str, message_str, **reaction_result.groupdict(), **message_result.groupdict(), **kwargs)
+                        rdata = callback(reaction_str, message_str,
+                                         **reaction_result.groupdict(), **message_result.groupdict(), **kwargs)
                     else:
-                        rdata = callback(reaction_str, message_str, *reaction_result.groups(), *message_result.groups(), **kwargs)
+                        rdata = callback(reaction_str, message_str,
+                                         *reaction_result.groups(), *message_result.groups(), **kwargs)
 
                     return rdata
 
@@ -118,7 +120,7 @@ class SlackController:
         for event in slack_events:
             pprint(event)
             try:
-                if event['type'] == 'message' and not 'subtype' in event:
+                if event['type'] == 'message' and 'subtype' not in event:
                     self.handle_message_event(event)
                 elif event['type'] in ['reaction_added']:
                     self.handle_reaction_event(event)
@@ -153,27 +155,27 @@ class SlackController:
             try:
                 # If its a reaction on a message
                 channel_id = full_data['reaction']['item']['channel']
-            except Exception: pass
-            else: break  # It worked
+            except Exception: pass  # noqa: E701
+            else: break  # It worked  # noqa: E701
 
             try:
                 # If its a reaction on an uploaded file to a dm/private channel
                 channel_id = full_data['file']['ims'][0]
-            except Exception: pass
-            else: break  # It worked
+            except Exception: pass  # noqa: E701
+            else: break  # It worked  # noqa: E701
 
             try:
                 # If its a reaction on an uploaded file to a public channel
                 channel_id = full_data['file']['channels'][0]
-            except Exception: pass
-            else: break  # It worked
+            except Exception: pass  # noqa: E701
+            else: break  # It worked  # noqa: E701
 
         full_data['channel'] = self._get_channel_data(channel_id)
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
-        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):
+        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') or
+                                                       self.channel_to_actions.get(full_data['channel']['name'])):
             response = {'channel': full_data['channel']['id'],
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
