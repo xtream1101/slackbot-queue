@@ -15,24 +15,35 @@ class Parser:
         self.message_listener = defaultdict(list)
         self.reaction_added_listener = defaultdict(list)
 
-    def message(self, regex_str, flags=0):
+    def trigger(self, *args, **kwargs):
+        event_type = args[0]
+        # Pass all other ars to the function (using [1:] to exclude the event_type)
+        if event_type == 'message':
+            return self._message(*args[1:], **kwargs)
+        elif event_type == 'reaction_added':
+            return self._reaction_added(*args[1:], **kwargs)
+
+    def _message(self, regex_str, flags=0):
         def wrapper(func):
             parse_with = re.compile(regex_str, flags)
             self.message_listener[func].append(parse_with)
-            logger.info(f"Registered listener `{func.__name__}` to regex `{regex_str}`")
-
+            logger.info("Registered listener `{func_name}` to regex `{regex_str}`".format(func_name=func.__name__,
+                                                                                          regex_str=regex_str))
             return func
 
         return wrapper
 
-    def reaction_added(self, reaction_regex, message_regex='.*', flags=0):
+    def _reaction_added(self, reaction_regex, message_regex='.*', flags=0):
         def wrapper(func):
             reaction_parse = re.compile(reaction_regex, flags)
             message_parse = re.compile(message_regex, flags)
             self.reaction_added_listener[func].append({'reaction': reaction_parse,
-                                              'message': message_parse})
-            logger.info(f"Registered listener `{func.__name__}` to regex `{reaction_regex}` & {message_regex}")
-
+                                                       'message': message_parse})
+            logger.info("Registered listener `{func_name}` to regex `{reaction_regex}` & {message_regex}"
+                        .format(func_name=func.__name__,
+                                reaction_regex=reaction_regex,
+                                message_regex=message_regex,
+                                ))
             return func
 
         return wrapper
@@ -55,6 +66,7 @@ class Parser:
                 reaction_result = re.search(command['reaction'], reaction_str)
                 message_result = re.search(command['message'], message_str)
                 if reaction_result is not None and message_result is not None:
+                    # BUG: Both regexes need to use named groups or normal groups, cnnot be mixed
                     if len(reaction_result.groupdict().keys()) != 0:
                         rdata = callback(reaction_str, message_str, **reaction_result.groupdict(), **message_result.groupdict(), **kwargs)
                     else:
@@ -67,6 +79,14 @@ class SlackController:
 
     def __init__(self):
         self.Parser = Parser
+
+    def add_commands(self, channel_commands):
+        for channel, commands in channel_commands.items():
+            for command in commands:
+                self.channel_to_actions[channel].append(command(self))
+
+    def _setup_client(self):
+        # Do not have this in __init__ because this is not needed when running tests
         self.slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
         self.channels = self._get_channel_list()
         self.channels.update(self._get_group_list())
@@ -76,12 +96,8 @@ class SlackController:
         self.BOT_NAME = '<@{}>'.format(self.BOT_ID)
         self.channel_to_actions = defaultdict(list)  # Filled in by the user
 
-    def add_commands(self, channel_commands):
-        for channel, commands in channel_commands.items():
-            for command in commands:
-                self.channel_to_actions[channel].append(command(self))
-
     def start_listener(self):
+        self._setup_client()
         RTM_READ_DELAY = 1  # 1 second delay between reading from RTM
 
         if self.slack_client.rtm_connect(with_team_state=False):
@@ -100,59 +116,82 @@ class SlackController:
             If its not found, then this function returns None, None.
         """
         for event in slack_events:
-            if event['type'] == 'message' and not 'subtype' in event:
-                self.handle_message_event(event)
-            elif event['type'] in ['reaction_added']:  # 'reaction_removed'
-                # be able to do something based off of this
-                self.handle_reaction_event(event)
-                pass
-            else:
-                # Can handle other things like reactions and such
-                pass
+            pprint(event)
+            try:
+                if event['type'] == 'message' and not 'subtype' in event:
+                    self.handle_message_event(event)
+                elif event['type'] in ['reaction_added']:
+                    self.handle_reaction_event(event)
+                else:
+                    # Can handle other things like reactions and such
+                    pass
+            except Exception:
+                logger.exception("Failed to parse event: {event}".format(event=event))
 
     def handle_reaction_event(self, reaction_event):
-        pprint(reaction_event)
-        # print(self.channels[reaction_event['item']['channel']])
         # Get the mesage that the reaction was added to
-        message = self.slack_client.api_call(**{'method': 'conversations.history',
-                                                'channel': reaction_event['item']['channel'],
-                                                'limit': 1,
-                                                'inclusive': True,
-                                                'latest': reaction_event['item']['ts'],
-                                                'oldest': reaction_event['item']['ts'],
-                                                })['messages'][0]
-
-        channel_data = self._get_channel_data(reaction_event['item']['channel'])
-        user_data = self._get_user_data(reaction_event['user'])
-
-        full_data = {'channel': channel_data,
-                     'message': message,
-                     'reaction': reaction_event,
-                     'user': user_data,
+        full_data = {'reaction': reaction_event,
+                     'user': self._get_user_data(reaction_event['user']),
                      }
+
+        if reaction_event['item']['type'] == 'message':
+            full_data['message'] = self.slack_client.api_call(**{'method': 'conversations.history',
+                                                                 'channel': reaction_event['item']['channel'],
+                                                                 'limit': 1,
+                                                                 'inclusive': True,
+                                                                 'latest': reaction_event['item']['ts'],
+                                                                 'oldest': reaction_event['item']['ts'],
+                                                                 })['messages'][0]
+
+        elif reaction_event['item']['type'] == 'file':
+            full_data['file'] = self.slack_client.api_call(**{'method': 'files.info',
+                                                              'file': reaction_event['item']['file'],
+                                                              })['file']
+
+        # Add channel data
+        for _ in range(1):
+            try:
+                # If its a reaction on a message
+                channel_id = full_data['reaction']['item']['channel']
+            except Exception: pass
+            else: break  # It worked
+
+            try:
+                # If its a reaction on an uploaded file to a dm/private channel
+                channel_id = full_data['file']['ims'][0]
+            except Exception: pass
+            else: break  # It worked
+
+            try:
+                # If its a reaction on an uploaded file to a public channel
+                channel_id = full_data['file']['channels'][0]
+            except Exception: pass
+            else: break  # It worked
+
+        full_data['channel'] = self._get_channel_data(channel_id)
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
         if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(channel_data['name']) is not None):
-            response = {'channel': channel_data['id'],  # Should not be changed
+                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):
+            response = {'channel': full_data['channel']['id'],
                         'as_user': True,  # Should not be changed
-                        'text': '',
-                        'attachments': [],
                         'method': 'chat.postMessage',
-                        # 'thread_reply': False,  # Only here for the response, does not get passed to the api call
-                        # 'add_to_queue': False,  # Only here for the response, does not get passed to the api call
                         }
 
             # Get all commands in channel
-            all_channel_commands = self.channel_to_actions.get(channel_data['name'], [])
+            all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
             # All commands that are in ALL channels
             all_channel_commands += self.channel_to_actions.get('__all__', [])
 
             parsed_response = None
             for command in all_channel_commands:
+                message_text = ' uploaded a file '
+                if full_data.get('message') is not None:
+                    message_text = full_data['message']['text']
+
                 parsed_response = command.parser.parse_reaction(full_data['reaction']['reaction'],
-                                                                full_data['message']['text'],
+                                                                message_text,
                                                                 full_event=full_data)
                 if parsed_response is not None:
                     response.update(parsed_response)
@@ -162,40 +201,10 @@ class SlackController:
                 # Only post a message if needed
                 self.slack_client.api_call(**response)
 
-    def _get_channel_data(self, channel):
-        channel_data = None
-        for _ in range(2):
-            if channel in self.channels:
-                channel_data = self.channels[channel]
-
-            elif channel in self.ims:
-                channel_data = self.ims[channel]
-                channel_data['name'] = '__direct_message__'
-
-            if channel_data is not None:
-                break
-            else:
-                # Refresh both channels and ims and try again
-                self.reload_channel_list()
-                self.reload_im_list()
-
-        return channel_data
-
-    def _get_user_data(self, user):
-        try:
-            user_data = self.users[user]
-        except KeyError:
-            self.reload_user_list()
-        finally:
-            user_data = self.users[user]
-
-        return user_data
-
     def handle_message_event(self, message_event):
         """
             Executes bot command if the command is known
         """
-        pprint(message_event)
         channel_data = self._get_channel_data(message_event['channel'])
         user_data = self._get_user_data(message_event['user'])
 
@@ -210,12 +219,10 @@ class SlackController:
                                                        self.channel_to_actions.get(channel_data['name']) is not None):
             response = {'channel': channel_data['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
-                        'text': '',
-                        'attachments': [],
                         'method': 'chat.postMessage',
-                        # 'thread_reply': False,  # Only here for the response, does not get passed to the api call
-                        # 'add_to_queue': False,  # Only here for the response, does not get passed to the api call
                         }
+            if message_event.get('thread_ts') is not None:
+                response['thread_ts'] = message_event.get('thread_ts')
 
             is_help_message = False
             help_messages_text = ['{bot_name} help'.format(bot_name=self.BOT_NAME),
@@ -251,6 +258,35 @@ class SlackController:
             if parsed_response is not None:
                 # Only post a message if needed
                 self.slack_client.api_call(**response)
+
+    def _get_channel_data(self, channel):
+        channel_data = None
+        for _ in range(2):
+            if channel in self.channels:
+                channel_data = self.channels[channel]
+
+            elif channel in self.ims:
+                channel_data = self.ims[channel]
+                channel_data['name'] = '__direct_message__'
+
+            if channel_data is not None:
+                break
+            else:
+                # Refresh both channels and ims and try again
+                self.reload_channel_list()
+                self.reload_im_list()
+
+        return channel_data
+
+    def _get_user_data(self, user):
+        try:
+            user_data = self.users[user]
+        except KeyError:
+            self.reload_user_list()
+        finally:
+            user_data = self.users[user]
+
+        return user_data
 
     def _get_channel_list(self):
             channels_call = self.slack_client.api_call("channels.list", exclude_archived=1)
