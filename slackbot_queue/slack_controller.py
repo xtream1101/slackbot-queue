@@ -1,7 +1,9 @@
 import os
 import re
 import time
+import json
 import logging
+from celery import Celery
 from pprint import pprint
 from collections import defaultdict
 from slackclient import SlackClient
@@ -73,7 +75,6 @@ class Parser:
                     else:
                         rdata = callback(reaction_str, message_str,
                                          *reaction_result.groups(), *message_result.groups(), **kwargs)
-
                     return rdata
 
 
@@ -81,25 +82,31 @@ class SlackController:
 
     def __init__(self):
         self.Parser = Parser
+        self.channel_to_actions = defaultdict(list)  # Filled in by the user
 
     def add_commands(self, channel_commands):
         for channel, commands in channel_commands.items():
             for command in commands:
                 self.channel_to_actions[channel].append(command(self))
 
-    def _setup_client(self):
+    def setup(self, slack_bot_token=None):
         # Do not have this in __init__ because this is not needed when running tests
-        self.slack_client = SlackClient(os.environ.get('SLACK_BOT_TOKEN'))
+        self.SLACK_BOT_TOKEN = slack_bot_token
+        if self.SLACK_BOT_TOKEN is None:
+            self.SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
+
+        self.slack_client = SlackClient(self.SLACK_BOT_TOKEN)
         self.channels = self._get_channel_list()
         self.channels.update(self._get_group_list())
         self.users = self._get_user_list()
         self.ims = self._get_im_list()
         self.BOT_ID = self.slack_client.api_call('auth.test')['user_id']
         self.BOT_NAME = '<@{}>'.format(self.BOT_ID)
-        self.channel_to_actions = defaultdict(list)  # Filled in by the user
+
+    def start_worker(self, argv=[]):
+        queue.start(argv=argv)
 
     def start_listener(self):
-        self._setup_client()
         RTM_READ_DELAY = 1  # 1 second delay between reading from RTM
 
         if self.slack_client.rtm_connect(with_team_state=False):
@@ -131,46 +138,52 @@ class SlackController:
                 logger.exception("Failed to parse event: {event}".format(event=event))
 
     def handle_reaction_event(self, reaction_event):
-        # Get the mesage that the reaction was added to
-        full_data = {'reaction': reaction_event,
-                     'user': self._get_user_data(reaction_event['user']),
-                     }
+        if 'type' in reaction_event:
+            # It came from slack
+            # Get the mesage that the reaction was added to
+            full_data = {'reaction': reaction_event,
+                         'user': self._get_user_data(reaction_event['user']),
+                         }
 
-        if reaction_event['item']['type'] == 'message':
-            full_data['message'] = self.slack_client.api_call(**{'method': 'conversations.history',
-                                                                 'channel': reaction_event['item']['channel'],
-                                                                 'limit': 1,
-                                                                 'inclusive': True,
-                                                                 'latest': reaction_event['item']['ts'],
-                                                                 'oldest': reaction_event['item']['ts'],
-                                                                 })['messages'][0]
+            if reaction_event['item']['type'] == 'message':
+                full_data['message'] = self.slack_client.api_call(**{'method': 'conversations.history',
+                                                                     'channel': reaction_event['item']['channel'],
+                                                                     'limit': 1,
+                                                                     'inclusive': True,
+                                                                     'latest': reaction_event['item']['ts'],
+                                                                     'oldest': reaction_event['item']['ts'],
+                                                                     })['messages'][0]
 
-        elif reaction_event['item']['type'] == 'file':
-            full_data['file'] = self.slack_client.api_call(**{'method': 'files.info',
-                                                              'file': reaction_event['item']['file'],
-                                                              })['file']
+            elif reaction_event['item']['type'] == 'file':
+                full_data['file'] = self.slack_client.api_call(**{'method': 'files.info',
+                                                                  'file': reaction_event['item']['file'],
+                                                                  })['file']
 
-        # Add channel data
-        for _ in range(1):
-            try:
-                # If its a reaction on a message
-                channel_id = full_data['reaction']['item']['channel']
-            except Exception: pass  # noqa: E701
-            else: break  # It worked  # noqa: E701
+            # Add channel data
+            for _ in range(1):
+                try:
+                    # If its a reaction on a message
+                    channel_id = full_data['reaction']['item']['channel']
+                except Exception: pass  # noqa: E701
+                else: break  # It worked  # noqa: E701
 
-            try:
-                # If its a reaction on an uploaded file to a dm/private channel
-                channel_id = full_data['file']['ims'][0]
-            except Exception: pass  # noqa: E701
-            else: break  # It worked  # noqa: E701
+                try:
+                    # If its a reaction on an uploaded file to a dm/private channel
+                    channel_id = full_data['file']['ims'][0]
+                except Exception: pass  # noqa: E701
+                else: break  # It worked  # noqa: E701
 
-            try:
-                # If its a reaction on an uploaded file to a public channel
-                channel_id = full_data['file']['channels'][0]
-            except Exception: pass  # noqa: E701
-            else: break  # It worked  # noqa: E701
+                try:
+                    # If its a reaction on an uploaded file to a public channel
+                    channel_id = full_data['file']['channels'][0]
+                except Exception: pass  # noqa: E701
+                else: break  # It worked  # noqa: E701
 
-        full_data['channel'] = self._get_channel_data(channel_id)
+            full_data['channel'] = self._get_channel_data(channel_id)
+
+        else:
+            # It came from the worker queue, meaning the message_event already has the full data
+            full_data = reaction_event
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
@@ -204,27 +217,29 @@ class SlackController:
                 self.slack_client.api_call(**response)
 
     def handle_message_event(self, message_event):
-        """
-            Executes bot command if the command is known
-        """
-        channel_data = self._get_channel_data(message_event['channel'])
-        user_data = self._get_user_data(message_event['user'])
+        if 'type' in message_event:
+            # It came from slack
+            channel_data = self._get_channel_data(message_event['channel'])
+            user_data = self._get_user_data(message_event['user'])
 
-        full_data = {'channel': channel_data,
-                     'message': message_event,
-                     'user': user_data,
-                     }
+            full_data = {'channel': channel_data,
+                         'message': message_event,
+                         'user': user_data,
+                         }
+        else:
+            # It came from the worker queue, meaning the message_event already has the full data
+            full_data = message_event
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
         if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(channel_data['name']) is not None):
-            response = {'channel': channel_data['id'],  # Should not be changed
+                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):
+            response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
                         }
-            if message_event.get('thread_ts') is not None:
-                response['thread_ts'] = message_event.get('thread_ts')
+            if full_data['message'].get('thread_ts') is not None:
+                response['thread_ts'] = full_data['message'].get('thread_ts')
 
             is_help_message = False
             help_messages_text = ['{bot_name} help'.format(bot_name=self.BOT_NAME),
@@ -234,7 +249,7 @@ class SlackController:
                 is_help_message = True
 
             # Get all commands in channel
-            all_channel_commands = self.channel_to_actions.get(channel_data['name'], [])
+            all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
             # All commands that are in ALL channels
             all_channel_commands += self.channel_to_actions.get('__all__', [])
 
@@ -325,3 +340,18 @@ class SlackController:
 
     def reload_user_list(self):
         self.users = self._get_user_list()
+
+
+slack_controller = SlackController()
+
+queue = Celery()
+
+
+@queue.task
+def worker(full_event):
+    full_event = json.loads(full_event)
+    full_event['is_worker'] = True
+    if 'reaction' in full_event:
+        slack_controller.handle_reaction_event(full_event)
+    else:
+        slack_controller.handle_message_event(full_event)
