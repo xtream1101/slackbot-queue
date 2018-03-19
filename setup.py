@@ -25,5 +25,6 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: Utilities",
     ],
-    install_requires=[],
+    install_requires=['celery==4.1.0',
+                      'slackclient==1.1.2'],
 )
