@@ -9,7 +9,7 @@ Slackbot with a celery queue for long running tasks
 
 ### Usage
 
-```
+```python
 from slackbot_queue import slack_controller, queue
 
 from example import Example  # Import the example command class
