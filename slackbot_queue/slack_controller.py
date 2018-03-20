@@ -3,8 +3,9 @@ import re
 import time
 import json
 import logging
+import urllib.error
+import urllib.request
 from celery import Celery
-from pprint import pprint
 from collections import defaultdict
 from slackclient import SlackClient
 
@@ -87,7 +88,7 @@ class SlackController:
     def add_commands(self, channel_commands):
         for channel, commands in channel_commands.items():
             for command in commands:
-                self.channel_to_actions[channel].append(command(self))
+                self.channel_to_actions[channel].append(command)
 
     def setup(self, slack_bot_token=None):
         # Do not have this in __init__ because this is not needed when running tests
@@ -125,7 +126,7 @@ class SlackController:
             If its not found, then this function returns None, None.
         """
         for event in slack_events:
-            pprint(event)
+            logger.debug("Event:\n{event}".format(event=event))
             try:
                 if event['type'] == 'message' and 'subtype' not in event:
                     self.handle_message_event(event)
@@ -237,6 +238,7 @@ class SlackController:
             response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
+                        'attachments': [],  # Needed for the help command
                         }
             if full_data['message'].get('thread_ts') is not None:
                 response['thread_ts'] = full_data['message'].get('thread_ts')
@@ -340,6 +342,45 @@ class SlackController:
 
     def reload_user_list(self):
         self.users = self._get_user_list()
+
+    def download(self, url, file_):
+        """
+        file_ is either a string (filename & path) to save the data to, or an in-memory object
+        """
+        rdata = None
+
+        base_dir = 'tmp_downloads'
+
+        try:
+            request = urllib.request.Request(url)
+            request.add_header('Authorization', 'Bearer {}'.format(self.SLACK_BOT_TOKEN))
+            # urllib downloads files a bit faster then requests does
+            with urllib.request.urlopen(request) as response:
+                data = response.read()
+                if isinstance(file_, str):
+                    file_path = os.path.abspath(os.path.join(base_dir, file_))
+
+                    try: os.mkdir(os.path.dirname(file_path))  # noqa
+                    except FileExistsError: pass  # noqa
+
+                    with open(file_path, 'wb') as out_file:
+                        out_file.write(data)
+
+                    rdata = file_path
+
+                else:
+                    file_.write(data)
+                    file_.seek(0)
+
+                    rdata = file_
+
+        except urllib.error.HTTPError as e:
+            logger.error("Download Http Error `{}` on {}".format(e.code, url))
+
+        except Exception:
+            logger.exception("Download Error on {}".format(url))
+
+        return rdata
 
 
 slack_controller = SlackController()
