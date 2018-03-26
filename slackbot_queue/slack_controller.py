@@ -128,7 +128,7 @@ class SlackController:
         for event in slack_events:
             logger.debug("Event:\n{event}".format(event=event))
             try:
-                if event['type'] == 'message' and 'subtype' not in event:
+                if event['type'] == 'message':
                     self.handle_message_event(event)
                 elif event['type'] in ['reaction_added']:
                     self.handle_reaction_event(event)
