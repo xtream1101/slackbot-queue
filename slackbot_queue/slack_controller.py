@@ -156,9 +156,14 @@ class SlackController:
                                                                      })['messages'][0]
 
             elif reaction_event['item']['type'] == 'file':
-                full_data['file'] = self.slack_client.api_call(**{'method': 'files.info',
+                try:
+                    full_data['file'] = self.slack_client.api_call(**{'method': 'files.info',
+                                                                      'file': reaction_event['item']['file'],
+                                                                      })['file']
+                except KeyError:
+                    logger.info(self.slack_client.api_call(**{'method': 'files.info',
                                                                   'file': reaction_event['item']['file'],
-                                                                  })['file']
+                                                                  }))
 
             # Add channel data
             for _ in range(1):
@@ -252,8 +257,12 @@ class SlackController:
 
             # Get all commands in channel
             all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
-            # All commands that are in ALL channels
-            all_channel_commands += self.channel_to_actions.get('__all__', [])
+            # All commands that are in ALL channels. Make the list unique.
+            # If not, if a command is in __all__ and another channel it will display the help twice
+            #   (also loop through twice when checking commands)
+            for command in self.channel_to_actions.get('__all__', []):
+                if command not in all_channel_commands:
+                    all_channel_commands.append(command)
 
             parsed_response = None
             for command in all_channel_commands:
@@ -276,7 +285,8 @@ class SlackController:
 
             if parsed_response is not None:
                 # Only post a message if needed
-                self.slack_client.api_call(**response)
+                response = self.slack_client.api_call(**response)
+                logger.debug("Slack api response: {response}".format(response=response))
 
     def _get_channel_data(self, channel):
         channel_data = None

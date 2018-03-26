@@ -2,6 +2,8 @@
 
 Slackbot with a celery queue for long running tasks
 
+This can be run even without a celery queue as long as you do not try and add things to the worker. Just run the listener and all the features (besides having a worker queue) will still work.
+
 
 ### Install
 `pip install slackbot-queue`  
@@ -39,3 +41,16 @@ slack_controller.start_worker(argv=['celery', 'worker', '--concurrency', '1', '-
 ```
 
 A full example can be found in the `example` dir.
+
+Slacks api docs: https://api.slack.com/methods
+
+If the command function returns `None`, that means that the bot will continue to check the rest of the commands.  
+But if the command does return something, no other commands will be checked. Meaning that if there are 2 commands that are looking for the same message regex, the command listed first in the channel list will be the only one triggered.
+
+If you want multiple commands to get triggered by the same message, you can have them return `None`, but sill post to slack inside you function by doing `self.slack.slack_client.api_call(**message_data)`.  
+`message_data` is the same as you would normally return but with the added keys (which are normally added when the data gets returned):  
+```
+'method': 'chat.postMessage',  # or any other method slack supports
+'channel': full_event['channel']['id'],
+'as_user': True,
+```
