@@ -163,8 +163,8 @@ class SlackController:
                                                                       })['file']
                 except KeyError:
                     logger.info(self.slack_client.api_call(**{'method': 'files.info',
-                                                                  'file': reaction_event['item']['file'],
-                                                                  }))
+                                                              'file': reaction_event['item']['file'],
+                                                              }))
 
             # Add channel data
             for _ in range(1):
@@ -240,7 +240,7 @@ class SlackController:
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
         if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):
+                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
             response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
