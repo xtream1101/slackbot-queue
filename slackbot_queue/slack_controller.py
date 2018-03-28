@@ -17,6 +17,7 @@ class Parser:
     def __init__(self):
         self.message_listener = defaultdict(list)
         self.reaction_added_listener = defaultdict(list)
+        self.file_share_listener = defaultdict(list)
 
     def trigger(self, *args, **kwargs):
         event_type = args[0]
@@ -25,6 +26,8 @@ class Parser:
             return self._message(*args[1:], **kwargs)
         elif event_type == 'reaction_added':
             return self._reaction_added(*args[1:], **kwargs)
+        elif event_type == 'file_share':
+            return self._file_share(*args[1:], **kwargs)
 
     def _message(self, regex_str, flags=0):
         def wrapper(func):
@@ -42,11 +45,25 @@ class Parser:
             message_parse = re.compile(message_regex, flags)
             self.reaction_added_listener[func].append({'reaction': reaction_parse,
                                                        'message': message_parse})
-            logger.info("Registered listener `{func_name}` to regex `{reaction_regex}` & {message_regex}"
+            logger.info("Registered listener `{func_name}` to regex `{reaction_regex}` & `{message_regex}`"
                         .format(func_name=func.__name__,
                                 reaction_regex=reaction_regex,
                                 message_regex=message_regex,
                                 ))
+            return func
+
+        return wrapper
+
+    def _file_share(self, filetype_regex, name_regex='.*', flags=0):
+        def wrapper(func):
+            filetype_parse = re.compile(filetype_regex, flags)
+            name_parse = re.compile(name_regex, flags)
+            self.file_share_listener[func].append({'filetype': filetype_parse,
+                                                   'name': name_parse})
+            logger.info("Registered listener `{func_name}` to regex `{filetype_regex}` & `{name_regex}`"
+                        .format(func_name=func.__name__,
+                                filetype_regex=filetype_regex,
+                                name_regex=name_regex))
             return func
 
         return wrapper
@@ -69,13 +86,28 @@ class Parser:
                 reaction_result = re.search(command['reaction'], reaction_str)
                 message_result = re.search(command['message'], message_str)
                 if reaction_result is not None and message_result is not None:
-                    # BUG: Both regexes need to use named groups or normal groups, cnnot be mixed
+                    # BUG: Both regexes need to use named groups or normal groups, cannot be mixed
                     if len(reaction_result.groupdict().keys()) != 0:
                         rdata = callback(reaction_str, message_str,
                                          **reaction_result.groupdict(), **message_result.groupdict(), **kwargs)
                     else:
                         rdata = callback(reaction_str, message_str,
                                          *reaction_result.groups(), *message_result.groups(), **kwargs)
+                    return rdata
+
+    def parse_file_share(self, filetype_str, name_str, **kwargs):
+        for callback in self.file_share_listener:
+            for command in self.file_share_listener[callback]:
+                filetype_result = re.search(command['filetype'], filetype_str)
+                name_result = re.search(command['name'], name_str)
+                if filetype_result is not None and name_result is not None:
+                    # BUG: Both regexes need to use named groups or normal groups, cannot be mixed
+                    if len(filetype_result.groupdict().keys()) != 0:
+                        rdata = callback(filetype_str, name_str,
+                                         **filetype_result.groupdict(), **name_result.groupdict(), **kwargs)
+                    else:
+                        rdata = callback(filetype_str, name_str,
+                                         *filetype_result.groups(), *name_result.groups(), **kwargs)
                     return rdata
 
 
@@ -129,10 +161,12 @@ class SlackController:
             logger.debug("Event:\n{event}".format(event=event))
             try:
                 if (event['type'] == 'message' and
-                        event.get('subtype', None) not in ['message_changed', 'message_deleted']):
+                        event.get('subtype', None) not in ['message_changed', 'message_deleted', 'file_share']):
                     self.handle_message_event(event)
                 elif event['type'] in ['reaction_added']:
                     self.handle_reaction_event(event)
+                elif event.get('subtype') == 'file_share':
+                    self.handle_file_share_event(event)
                 else:
                     # Can handle other things like reactions and such
                     pass
@@ -163,8 +197,8 @@ class SlackController:
                                                                       })['file']
                 except KeyError:
                     logger.info(self.slack_client.api_call(**{'method': 'files.info',
-                                                                  'file': reaction_event['item']['file'],
-                                                                  }))
+                                                              'file': reaction_event['item']['file'],
+                                                              }))
 
             # Add channel data
             for _ in range(1):
@@ -240,7 +274,7 @@ class SlackController:
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
         if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):
+                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
             response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
@@ -283,6 +317,55 @@ class SlackController:
                             response['attachments'].extend(parsed_response)
                     except AttributeError as e:
                         logger.error("Missing help function in class: {e}".format(e=e))
+
+            if parsed_response is not None:
+                # Only post a message if needed
+                response = self.slack_client.api_call(**response)
+                logger.debug("Slack api response: {response}".format(response=response))
+
+    def handle_file_share_event(self, file_share_event):
+        if 'type' in file_share_event:
+            # It came from slack
+            channel_data = self._get_channel_data(file_share_event['channel'])
+            user_data = self._get_user_data(file_share_event['user'])
+
+            full_data = {'channel': channel_data,
+                         'file_share': file_share_event,
+                         'user': user_data,
+                         }
+        else:
+            # It came from the worker queue, meaning the file_share_event already has the full data
+            full_data = file_share_event
+
+        # Do not ever trigger its self
+        # Only parse the message if the message came from a channel that has commands in it
+        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
+                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
+            response = {'channel': full_data['channel']['id'],  # Should not be changed
+                        'as_user': True,  # Should not be changed
+                        'method': 'chat.postMessage',
+                        'attachments': [],  # Needed for the help command
+                        }
+            if full_data['file_share'].get('thread_ts') is not None:
+                response['thread_ts'] = full_data['file_share'].get('thread_ts')
+
+            # Get all commands in channel
+            all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
+            # All commands that are in ALL channels. Make the list unique.
+            # If not, if a command is in __all__ and another channel it will display the help twice
+            #   (also loop through twice when checking commands)
+            for command in self.channel_to_actions.get('__all__', []):
+                if command not in all_channel_commands:
+                    all_channel_commands.append(command)
+
+            parsed_response = None
+            for command in all_channel_commands:
+                parsed_response = command.parser.parse_file_share(full_data['file_share']['file']['filetype'],
+                                                                  full_data['file_share']['file']['name'],
+                                                                  full_event=full_data)
+                if parsed_response is not None:
+                    response.update(parsed_response)
+                    break
 
             if parsed_response is not None:
                 # Only post a message if needed
@@ -405,5 +488,7 @@ def worker(full_event):
     full_event['is_worker'] = True
     if 'reaction' in full_event:
         slack_controller.handle_reaction_event(full_event)
+    elif 'file_share' in full_event:
+        slack_controller.handle_file_share_event(full_event)
     else:
         slack_controller.handle_message_event(full_event)
