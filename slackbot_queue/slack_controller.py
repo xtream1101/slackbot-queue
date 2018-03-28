@@ -403,7 +403,7 @@ class SlackController:
 
     def _get_channel_list(self):
         channels_call = self.slack_client.api_call("channels.list", exclude_archived=1)
-        logger.debug("_get_channel_list: " + channels_call)
+        logger.debug("_get_channel_list: " + str(channels_call))
         if channels_call['ok']:
             by_id = {item['id']: item for item in channels_call['channels']}
             by_name = {item['name']: item for item in channels_call['channels']}
@@ -411,7 +411,7 @@ class SlackController:
 
     def _get_group_list(self):
         groups_call = self.slack_client.api_call("groups.list", exclude_archived=1)
-        logger.debug("_get_group_list: " + groups_call)
+        logger.debug("_get_group_list: " + str(groups_call))
         if groups_call['ok']:
             by_id = {item['id']: item for item in groups_call['groups']}
             by_name = {item['name']: item for item in groups_call['groups']}
@@ -419,7 +419,7 @@ class SlackController:
 
     def _get_user_list(self):
         users_call = self.slack_client.api_call("users.list")
-        logger.debug("_get_user_list: " + users_call)
+        logger.debug("_get_user_list: " + str(users_call))
         if users_call['ok']:
             by_id = {item['id']: item for item in users_call['members']}
             by_name = {item['name']: item for item in users_call['members']}
@@ -427,7 +427,7 @@ class SlackController:
 
     def _get_im_list(self):
         ims_call = self.slack_client.api_call("im.list")
-        logger.debug("_get_im_list: " + ims_call)
+        logger.debug("_get_im_list: " + str(ims_call))
         if ims_call['ok']:
             return {item['id']: item for item in ims_call['ims']}
 
