@@ -196,9 +196,13 @@ class SlackController:
                                                                       'file': reaction_event['item']['file'],
                                                                       })['file']
                 except KeyError:
-                    logger.info(self.slack_client.api_call(**{'method': 'files.info',
-                                                              'file': reaction_event['item']['file'],
-                                                              }))
+                    file_response = self.slack_client.api_call(**{'method': 'files.info',
+                                                                  'file': reaction_event['item']['file'],
+                                                                  })
+                    if file_response['error'] != 'file_not_found':
+                        logger.warning(file_response)
+
+                    return  # No need to continue if we do not have access to the file
 
             # Add channel data
             for _ in range(1):
