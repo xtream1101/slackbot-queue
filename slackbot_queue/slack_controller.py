@@ -128,6 +128,9 @@ class SlackController:
         if self.SLACK_BOT_TOKEN is None:
             self.SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
 
+        if self.SLACK_BOT_TOKEN is None:
+            raise ValueError("Missing SLACK_BOT_TOKEN")
+
         self.slack_client = SlackClient(self.SLACK_BOT_TOKEN)
         self.channels = self._get_channel_list()
         self.channels.update(self._get_group_list())
@@ -173,6 +176,18 @@ class SlackController:
                     pass
             except Exception:
                 logger.exception("Failed to parse event: {event}".format(event=event))
+
+    def _get_all_channel_commands(self, full_data):
+        # Get all commands in channel
+        all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
+        # All commands that are in ALL channels. Make the list unique.
+        # If not, if a command is in __all__ and another channel it will display the help twice
+        #   (also loop through twice when checking commands)
+        for command in self.channel_to_actions.get('__all__', []):
+            if command not in all_channel_commands:
+                all_channel_commands.append(command)
+
+        return all_channel_commands
 
     def handle_reaction_event(self, reaction_event):
         if 'type' in reaction_event:
@@ -241,9 +256,7 @@ class SlackController:
                         }
 
             # Get all commands in channel
-            all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
-            # All commands that are in ALL channels
-            all_channel_commands += self.channel_to_actions.get('__all__', [])
+            all_channel_commands = self._get_all_channel_commands(full_data)
 
             parsed_response = None
             for command in all_channel_commands:
@@ -296,13 +309,7 @@ class SlackController:
                 is_help_message = True
 
             # Get all commands in channel
-            all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
-            # All commands that are in ALL channels. Make the list unique.
-            # If not, if a command is in __all__ and another channel it will display the help twice
-            #   (also loop through twice when checking commands)
-            for command in self.channel_to_actions.get('__all__', []):
-                if command not in all_channel_commands:
-                    all_channel_commands.append(command)
+            all_channel_commands = self._get_all_channel_commands(full_data)
 
             parsed_response = None
             for command in all_channel_commands:
@@ -355,13 +362,7 @@ class SlackController:
                 response['thread_ts'] = full_data['file_share'].get('thread_ts')
 
             # Get all commands in channel
-            all_channel_commands = self.channel_to_actions.get(full_data['channel']['name'], [])
-            # All commands that are in ALL channels. Make the list unique.
-            # If not, if a command is in __all__ and another channel it will display the help twice
-            #   (also loop through twice when checking commands)
-            for command in self.channel_to_actions.get('__all__', []):
-                if command not in all_channel_commands:
-                    all_channel_commands.append(command)
+            all_channel_commands = self._get_all_channel_commands(full_data)
 
             parsed_response = None
             for command in all_channel_commands:
