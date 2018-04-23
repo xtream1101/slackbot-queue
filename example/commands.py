@@ -1,3 +1,4 @@
+import os
 import logging
 import argparse
 from slackbot_queue import slack_controller, queue
@@ -16,19 +17,19 @@ args = parser.parse_args()
 queue.conf.task_default_queue = 'custom_slackbot'
 queue.conf.broker_url = 'amqp://guest:guest@localhost:5672//'
 
-# The token could also be set by the env variable SLACK_BOT_TOKEN
-slack_controller.setup(slack_bot_token='xxxxxxxx')
-
-# Order of the commands in the channel matter, the first match it finds it will stop
-# The order of the channels do not matter though
+# By default the slack token is set by the env var `SLACK_BOT_TOKEN`
+# But can also be passed in as a named arg to setup as `slack_bot_token="token_here"`
+slack_controller.setup()
 
 # Each class needs to be passed the `slack_controller`
 example = Example(slack_controller)
 example2 = Example2(slack_controller)
 
-commands = {'__direct_message__': [example, example2],
-            '__all__': [],
-            'general': [example],
+# Order of the commands in the channel matter, the first match it finds it will stop
+# The order of the channels do not matter though
+commands = {'__direct_message__': [],
+            '__all__': [example, example2],
+            'general': [],
             }
 slack_controller.add_commands(commands)
 
