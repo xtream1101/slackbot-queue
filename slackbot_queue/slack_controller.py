@@ -117,6 +117,9 @@ class SlackController:
         self.Parser = Parser
         self.channel_to_actions = defaultdict(list)  # Filled in by the user
 
+        # Defaults for the help message
+        self.help_message_regex = None  # The user can override this, or it will default to whats in the setup()
+
     def add_commands(self, channel_commands):
         for channel, commands in channel_commands.items():
             for command in commands:
@@ -139,11 +142,45 @@ class SlackController:
         self.BOT_ID = self.slack_client.api_call('auth.test')['user_id']
         self.BOT_NAME = '<@{}>'.format(self.BOT_ID)
 
+        if self.help_message_regex is None:
+            self.help_message_regex = re.compile('^(?:{bot_name} )?help$'.format(bot_name=self.BOT_NAME),
+                                                 flags=re.IGNORECASE)
+
+    def help(self, commands, full_event, slack_client):
+        """Default help response
+
+        Args:
+            commands (list): List of the command classes that are in the channel where help was triggered
+            full_event (dict): All of the data from the slack client
+            slack_client (SlackClient): Api to send message directly to the slack api
+
+        Returns:
+            dict/None: dict of dat to send to the slack api
+                       the keys `channel` & `as_user` & `method` are added before posting on return
+
+        """
+        message_data = {'method': 'chat.postEphemeral',
+                        'user': full_event['user']['id'],
+                        'text': 'Here are all the commands available in this channel',
+                        'attachments': [],
+                        }
+
+        for command in commands:
+            try:
+                parsed_response = command.help()
+                if parsed_response is not None:
+                    # Add the help message from the command to the return message
+                    message_data['attachments'].extend(parsed_response.get('attachments', []))
+            except AttributeError as e:
+                logger.warning("Missing help function in class: {e}".format(e=e))
+
+        return message_data
+
     def start_worker(self, argv=[]):
         queue.start(argv=argv)
 
     def start_listener(self):
-        RTM_READ_DELAY = 1  # 1 second delay between reading from RTM
+        RTM_READ_DELAY = 1  # noqa, 1 second delay between reading from RTM
 
         if self.slack_client.rtm_connect(with_team_state=False):
             logger.info("Starter Bot connected and running!")
@@ -296,39 +333,28 @@ class SlackController:
             response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
-                        'attachments': [],  # Needed for the help command
                         }
             if full_data['message'].get('thread_ts') is not None:
+                # This is so a message reply that is from a thread will auto stay in the thread
                 response['thread_ts'] = full_data['message'].get('thread_ts')
-
-            is_help_message = False
-            help_messages_text = ['{bot_name} help'.format(bot_name=self.BOT_NAME),
-                                  'help',
-                                  ]
-            if full_data['message']['text'] in help_messages_text:
-                is_help_message = True
 
             # Get all commands in channel
             all_channel_commands = self._get_all_channel_commands(full_data)
 
             parsed_response = None
-            for command in all_channel_commands:
-                if is_help_message is False:
+            if re.match(self.help_message_regex, full_data['message']['text']) is None:
+                # Not the help command, check other functions
+                for command in all_channel_commands:
                     parsed_response = command.parser.parse_message(full_data['message']['text'],
                                                                    full_event=full_data)
                     if parsed_response is not None:
                         response.update(parsed_response)
                         break
-                else:
-                    try:
-                        parsed_response = command.help().get('attachments')
-                        if parsed_response is not None:
-                            response['method'] = 'chat.postEphemeral'
-                            response['user'] = full_data['user']['id']
-                            response['text'] = 'Here are all the commands available in this channel'
-                            response['attachments'].extend(parsed_response)
-                    except AttributeError as e:
-                        logger.error("Missing help function in class: {e}".format(e=e))
+            else:
+                # The help command was triggered
+                parsed_response = self.help(all_channel_commands, full_data, self.slack_client)
+                if parsed_response is not None:
+                    response.update(parsed_response)
 
             if parsed_response is not None:
                 # Only post a message if needed
