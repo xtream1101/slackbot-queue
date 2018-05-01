@@ -10,6 +10,7 @@ This can be run even without a celery queue as long as you do not try and add th
 
 
 ### Usage
+The `example` folder has a lot more to show and is ready to run
 
 ```python
 from slackbot_queue import slack_controller, queue
