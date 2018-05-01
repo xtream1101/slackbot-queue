@@ -1,6 +1,6 @@
 import re
 import logging
-from pprint import pprint
+from pprint import pprint  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -8,15 +8,18 @@ logger = logging.getLogger(__name__)
 class Example2:
 
     def __init__(self, slack):
-        self.slack = slack
-        # ^ you get access to `self.slack.slack_client` to be able to do even more custom stuff like in `multi_action()`
         # Slack client docs: https://github.com/slackapi/python-slackclient
         # All Slack methods: https://api.slack.com/methods/
+        # Gives you access to `self.slack.slack_client` to be able to do even more custom stuff like in `multi_action()`
+        self.slack = slack
 
+        # The order that these triggers are setup in matters.
+        # It will run the function of the first one it matches with
         self.parser = slack.Parser()
 
         # Listen for the @bot-name in the message
-        self.add_reaction = self.parser.trigger('message', 'Hi {bot}'.format(bot=self.slack.BOT_NAME))(self.add_reaction)
+        self.add_reaction = self.parser.trigger('message', 'Hi {bot}'.format(bot=self.slack.BOT_NAME)
+                                                )(self.add_reaction)
 
         # Make the string match case incentive
         # `flags` is the same flags that get passed to `re`:
@@ -32,7 +35,7 @@ class Example2:
         # Listen for the reaction: "grin"
         #          on the message: "react"
         self.reaction_action = self.parser.trigger('reaction_added', 'grin', '^react$',
-                                             flags=re.IGNORECASE)(self.reaction_action)
+                                                   flags=re.IGNORECASE)(self.reaction_action)
 
     def add_reaction(self, matched_str, full_event={}):
         """ Add reaction to a message
@@ -118,7 +121,7 @@ class Example2:
                 '\n- upload a csv file'
                 '\n- Add a :grin: reaction to a message that is just "reply"'
                 '\n').format(bot=self.slack.BOT_NAME)
-        message_data = {'attachments': [{'title': "Example Commands",
+        message_data = {'attachments': [{'title': "Example2 Commands",
                                          'color': "#2BB8DE",
                                          'text': text,
                                          'mrkdwn_in': ['text', 'pretext'],
