@@ -146,7 +146,7 @@ class SlackController:
             self.help_message_regex = re.compile('^(?:{bot_name} )?help$'.format(bot_name=self.BOT_NAME),
                                                  flags=re.IGNORECASE)
 
-    def help(self, commands, full_event, slack_client):
+    def help(self, commands, slack_client, full_event={}):
         """Default help response
 
         Args:
