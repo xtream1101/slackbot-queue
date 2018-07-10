@@ -352,7 +352,7 @@ class SlackController:
                         break
             else:
                 # The help command was triggered
-                parsed_response = self.help(all_channel_commands, full_data, self.slack_client)
+                parsed_response = self.help(all_channel_commands, self.slack_client, full_event=full_data)
                 if parsed_response is not None:
                     response.update(parsed_response)
 
