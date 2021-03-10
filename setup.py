@@ -10,7 +10,7 @@ except (IOError, ImportError) as e:
 setup(
     name='slackbot-queue',
     packages=['slackbot_queue'],
-    version='0.3.2',
+    version='0.3.3',
     description='Slackbot with a celery queue for long running tasks',
     long_description=long_description,
     author='Eddy Hintze',

@@ -6,7 +6,7 @@ import logging
 import urllib.error
 import urllib.request
 from celery import Celery
-from inspect import getargspec
+from inspect import getfullargspec
 from collections import defaultdict
 from slackclient import SlackClient
 
@@ -77,7 +77,11 @@ class Parser:
                     if len(result.groupdict().keys()) != 0:
                         rdata = callback(message_str, **result.groupdict(), **kwargs)
                     else:
-                        cb_arg_spec = getargspec(callback)
+                        cb_arg_spec = callback
+                        # unwrap functions to get the core function
+                        while hasattr(cb_arg_spec, '__wrapped__') is True:
+                            cb_arg_spec = cb_arg_spec.__wrapped__
+                        cb_arg_spec = getfullargspec(cb_arg_spec)
                         # Ignore any named args
                         cb_arg_count = len(cb_arg_spec.args) - len(cb_arg_spec.defaults)
                         cb_arg_count -= 1  # Since the message_str is always passed
@@ -96,7 +100,6 @@ class Parser:
                             logger.error("To {msg_amount} regex groups found for function {fn}"
                                          .format(msg_amount=msg_amount,
                                                  fn=callback.__name__))
-
 
                     return rdata
 
@@ -156,7 +159,7 @@ class SlackController:
 
         self.slack_client = SlackClient(self.SLACK_BOT_TOKEN)
         self.channels = self._get_channel_list()
-        self.channels.update(self._get_group_list())
+        # self.channels.update(self._get_group_list())
         self.users = self._get_user_list()
         self.ims = self._get_im_list()
         self.BOT_ID = self.slack_client.api_call('auth.test')['user_id']
@@ -454,19 +457,17 @@ class SlackController:
         return user_data
 
     def _get_channel_list(self):
-        channels_call = self.slack_client.api_call("channels.list", exclude_archived=1)
+        channels_call = self.slack_client.api_call(
+            "conversations.list",
+            limit=1000,
+            exclude_archived=1,
+            types="public_channel,private_channel",  # include all types of channels in comma-separated str
+        )
         logger.debug("_get_channel_list: " + str(channels_call))
         if channels_call['ok']:
-            by_id = {item['id']: item for item in channels_call['channels']}
-            by_name = {item['name']: item for item in channels_call['channels']}
-            return {**by_id, **by_name}
-
-    def _get_group_list(self):
-        groups_call = self.slack_client.api_call("groups.list", exclude_archived=1)
-        logger.debug("_get_group_list: " + str(groups_call))
-        if groups_call['ok']:
-            by_id = {item['id']: item for item in groups_call['groups']}
-            by_name = {item['name']: item for item in groups_call['groups']}
+            # some channels don't have names, so need filter them out. Same with IDs just to be safe
+            by_id = {item['id']: item for item in channels_call['channels'] if 'id' in item}
+            by_name = {item['name']: item for item in channels_call['channels'] if 'name' in item}
             return {**by_id, **by_name}
 
     def _get_user_list(self):
@@ -478,14 +479,20 @@ class SlackController:
             return {**by_id, **by_name}
 
     def _get_im_list(self):
-        ims_call = self.slack_client.api_call("im.list")
+        ims_call = self.slack_client.api_call(
+            "conversations.list",
+            limit=1000,
+            exclude_archived=1,
+            types="mpim,im",  # include all types of channels in comma-separated str
+        )
         logger.debug("_get_im_list: " + str(ims_call))
         if ims_call['ok']:
-            return {item['id']: item for item in ims_call['ims']}
+            # some channels don't have names, so need filter them out. Same with IDs just to be safe
+            return {item['id']: item for item in ims_call['channels']}
 
     def reload_channel_list(self):
         self.channels = self._get_channel_list()
-        self.channels.update(self._get_group_list())
+        # self.channels.update(self._get_group_list())
 
     def reload_im_list(self):
         self.ims = self._get_im_list()
