@@ -52,7 +52,7 @@ class Example:
         """
         text = ('- task <task name>\n'
                 '- Add a reaction, and the bot will react with the same thing\n'
-                ).format(bot_name=self.slack.BOT_NAME)
+                )
         message_data = {'attachments': [{'title': "Example Commands",
                                          'color': "#2f7a30",
                                          'text': text,

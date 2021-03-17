@@ -200,9 +200,9 @@ class SlackController:
         for event in slack_events:
             logger.debug("Event:\n{event}".format(event=event))
             try:
-                if (event['type'] == 'message' and
-                        event.get('subtype', None) not in ['message_changed', 'message_deleted',
-                                                           'file_share', 'message_replied']):
+                if (event['type'] == 'message'
+                        and event.get('subtype', None) not in ['message_changed', 'message_deleted',
+                                                               'file_share', 'message_replied']):
                     self.handle_message_event(event)
                 elif event['type'] in ['reaction_added']:
                     self.handle_reaction_event(event)
@@ -285,8 +285,8 @@ class SlackController:
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
-        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') or
-                                                       self.channel_to_actions.get(full_data['channel']['name'])):
+        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__')
+                                                       or self.channel_to_actions.get(full_data['channel']['name'])):
             response = {'channel': full_data['channel']['id'],
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
@@ -328,8 +328,8 @@ class SlackController:
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
-        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
+        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None
+                                                       or self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
             response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
@@ -377,8 +377,8 @@ class SlackController:
 
         # Do not ever trigger its self
         # Only parse the message if the message came from a channel that has commands in it
-        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None or
-                                                       self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
+        if full_data['user']['id'] != self.BOT_ID and (self.channel_to_actions.get('__all__') is not None
+                                                       or self.channel_to_actions.get(full_data['channel']['name']) is not None):  # noqa: E501
             response = {'channel': full_data['channel']['id'],  # Should not be changed
                         'as_user': True,  # Should not be changed
                         'method': 'chat.postMessage',
