@@ -6,7 +6,6 @@ import logging
 import urllib.error
 import urllib.request
 from celery import Celery
-from inspect import getfullargspec
 from collections import defaultdict
 from slackclient import SlackClient
 
@@ -77,29 +76,7 @@ class Parser:
                     if len(result.groupdict().keys()) != 0:
                         rdata = callback(message_str, **result.groupdict(), **kwargs)
                     else:
-                        cb_arg_spec = callback
-                        # unwrap functions to get the core function
-                        while hasattr(cb_arg_spec, '__wrapped__') is True:
-                            cb_arg_spec = cb_arg_spec.__wrapped__
-                        cb_arg_spec = getfullargspec(cb_arg_spec)
-                        # Ignore any named args
-                        cb_arg_count = len(cb_arg_spec.args) - len(cb_arg_spec.defaults)
-                        cb_arg_count -= 1  # Since the message_str is always passed
-                        if cb_arg_spec.args[0] in ('self', 'cls'):
-                            # Ignore self or cls args
-                            cb_arg_count -= 1
-
-                        if len(result.groups()) == cb_arg_count:
-                            rdata = callback(message_str, *result.groups(), **kwargs)
-                        else:
-                            rdata = {}
-                            if len(result.groups()) > cb_arg_count:
-                                msg_amount = 'many'
-                            else:
-                                msg_amount = 'few'
-                            logger.error("To {msg_amount} regex groups found for function {fn}"
-                                         .format(msg_amount=msg_amount,
-                                                 fn=callback.__name__))
+                        rdata = callback(message_str, *result.groups(), **kwargs)
 
                     return rdata
 
