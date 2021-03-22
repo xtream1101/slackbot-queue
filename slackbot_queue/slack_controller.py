@@ -10,7 +10,7 @@ from collections import defaultdict
 from slackclient import SlackClient
 
 logger = logging.getLogger(__name__)
-from pprint import pprint
+
 
 class Parser:
 
@@ -200,7 +200,6 @@ class SlackController:
         for event in slack_events:
             logger.debug("Event:\n{event}".format(event=event))
             try:
-                print("sadas", event)
                 if (event['type'] == 'message'
                         and (event.get('subtype', None) not in ['message_changed', 'message_deleted',
                                                                 'file_share', 'message_replied']
