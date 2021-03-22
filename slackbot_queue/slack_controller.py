@@ -10,7 +10,7 @@ from collections import defaultdict
 from slackclient import SlackClient
 
 logger = logging.getLogger(__name__)
-
+from pprint import pprint
 
 class Parser:
 
@@ -200,13 +200,15 @@ class SlackController:
         for event in slack_events:
             logger.debug("Event:\n{event}".format(event=event))
             try:
+                print("sadas", event)
                 if (event['type'] == 'message'
-                        and event.get('subtype', None) not in ['message_changed', 'message_deleted',
-                                                               'file_share', 'message_replied']):
+                        and (event.get('subtype', None) not in ['message_changed', 'message_deleted',
+                                                                'file_share', 'message_replied']
+                             and not event.get('files'))):
                     self.handle_message_event(event)
                 elif event['type'] in ['reaction_added']:
                     self.handle_reaction_event(event)
-                elif event.get('subtype') == 'file_share':
+                elif event.get('files'):
                     self.handle_file_share_event(event)
                 else:
                     # Can handle other things like reactions and such
@@ -391,6 +393,8 @@ class SlackController:
             all_channel_commands = self._get_all_channel_commands(full_data)
 
             parsed_response = None
+            # To keep the commands in bots compatable with old syntax
+            full_data['file_share']['file'] = full_data['file_share']['files'][0]
             for command in all_channel_commands:
                 parsed_response = command.parser.parse_file_share(full_data['file_share']['file']['filetype'],
                                                                   full_data['file_share']['file']['name'],
